@@ -228,6 +228,14 @@
 		39DA84F7161978D7001E7F79 /* NSDictionary+Merge.m in Sources */ = {isa = PBXBuildFile; fileRef = 39DA84F5161978D7001E7F79 /* NSDictionary+Merge.m */; };
 		39DA84F9161978DE001E7F79 /* NSDictionary+Merge.m in Sources */ = {isa = PBXBuildFile; fileRef = 39DA84F5161978D7001E7F79 /* NSDictionary+Merge.m */; };
 		39DA84FD16198753001E7F79 /* NSDictionary+Merge_Tests.m in Sources */ = {isa = PBXBuildFile; fileRef = 39DA84FB16198753001E7F79 /* NSDictionary+Merge_Tests.m */; };
+		C7B4D7111675CB3D009F6094 /* NSData+Base64.h in Headers */ = {isa = PBXBuildFile; fileRef = C7B4D70F1675CB3D009F6094 /* NSData+Base64.h */; };
+		C7B4D7121675CB3D009F6094 /* NSData+Base64.h in Headers */ = {isa = PBXBuildFile; fileRef = C7B4D70F1675CB3D009F6094 /* NSData+Base64.h */; };
+		C7B4D7131675CB3D009F6094 /* NSData+Base64.m in Sources */ = {isa = PBXBuildFile; fileRef = C7B4D7101675CB3D009F6094 /* NSData+Base64.m */; };
+		C7B4D7141675CB3D009F6094 /* NSData+Base64.m in Sources */ = {isa = PBXBuildFile; fileRef = C7B4D7101675CB3D009F6094 /* NSData+Base64.m */; };
+		C7F3F79E1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h in Headers */ = {isa = PBXBuildFile; fileRef = C7F3F79C1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h */; };
+		C7F3F79F1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h in Headers */ = {isa = PBXBuildFile; fileRef = C7F3F79C1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		C7F3F7A01675ADF900ACF844 /* KSCrashReportSinkBuildozer.m in Sources */ = {isa = PBXBuildFile; fileRef = C7F3F79D1675ADF900ACF844 /* KSCrashReportSinkBuildozer.m */; };
+		C7F3F7A11675ADF900ACF844 /* KSCrashReportSinkBuildozer.m in Sources */ = {isa = PBXBuildFile; fileRef = C7F3F79D1675ADF900ACF844 /* KSCrashReportSinkBuildozer.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -392,6 +400,10 @@
 		39DA84F4161978D7001E7F79 /* NSDictionary+Merge.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.objj.h; path = "NSDictionary+Merge.h"; sourceTree = "<group>"; };
 		39DA84F5161978D7001E7F79 /* NSDictionary+Merge.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSDictionary+Merge.m"; sourceTree = "<group>"; };
 		39DA84FB16198753001E7F79 /* NSDictionary+Merge_Tests.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSDictionary+Merge_Tests.m"; sourceTree = "<group>"; };
+		C7B4D70F1675CB3D009F6094 /* NSData+Base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "NSData+Base64.h"; sourceTree = "<group>"; };
+		C7B4D7101675CB3D009F6094 /* NSData+Base64.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "NSData+Base64.m"; sourceTree = "<group>"; };
+		C7F3F79C1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = KSCrashReportSinkBuildozer.h; sourceTree = "<group>"; };
+		C7F3F79D1675ADF900ACF844 /* KSCrashReportSinkBuildozer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = KSCrashReportSinkBuildozer.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -563,6 +575,8 @@
 				39DA831516184492001E7F79 /* KSVarArgs.h */,
 				39DA831616184492001E7F79 /* NSData+GZip.h */,
 				39DA831716184492001E7F79 /* NSData+GZip.m */,
+				C7B4D70F1675CB3D009F6094 /* NSData+Base64.h */,
+				C7B4D7101675CB3D009F6094 /* NSData+Base64.m */,
 				39DA84F4161978D7001E7F79 /* NSDictionary+Merge.h */,
 				39DA84F5161978D7001E7F79 /* NSDictionary+Merge.m */,
 				39DA831816184492001E7F79 /* NSMutableData+AppendUTF8.h */,
@@ -596,6 +610,8 @@
 				39DA82DE16184487001E7F79 /* KSCrashReportSinkQuincy.m */,
 				39DA82DF16184487001E7F79 /* KSCrashReportSinkStandard.h */,
 				39DA82E016184487001E7F79 /* KSCrashReportSinkStandard.m */,
+				C7F3F79C1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h */,
+				C7F3F79D1675ADF900ACF844 /* KSCrashReportSinkBuildozer.m */,
 			);
 			name = Filters;
 			sourceTree = "<group>";
@@ -737,6 +753,8 @@
 				39DA833016184492001E7F79 /* NSMutableData+AppendUTF8.h in Headers */,
 				39DA8399161844FF001E7F79 /* RFC3339DateTool.h in Headers */,
 				394DCC71164F43C2008A4C50 /* KSCrashDoctor.h in Headers */,
+				C7F3F79E1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h in Headers */,
+				C7B4D7111675CB3D009F6094 /* NSData+Base64.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -758,6 +776,7 @@
 				39DA830216184487001E7F79 /* KSCrashReportSinkEMail.h in Headers */,
 				39DA830616184487001E7F79 /* KSCrashReportSinkQuincy.h in Headers */,
 				39DA830A16184487001E7F79 /* KSCrashReportSinkStandard.h in Headers */,
+				C7F3F79F1675ADF900ACF844 /* KSCrashReportSinkBuildozer.h in Headers */,
 				39DA836C161844FF001E7F79 /* KSJSONCodecObjC.h in Headers */,
 				397A7C88162266480096E287 /* KSCrashReportFields.h in Headers */,
 				39DA835A161844FF001E7F79 /* ARCSafe_MemMgmt.h in Headers */,
@@ -796,6 +815,7 @@
 				39DA8398161844FF001E7F79 /* LoadableCategory.h in Headers */,
 				39DA839A161844FF001E7F79 /* RFC3339DateTool.h in Headers */,
 				394DCC73164F547E008A4C50 /* KSCrashDoctor.h in Headers */,
+				C7B4D7121675CB3D009F6094 /* NSData+Base64.h in Headers */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -985,6 +1005,8 @@
 				39DA83D51618450A001E7F79 /* KSSystemInfo.m in Sources */,
 				39DA84F7161978D7001E7F79 /* NSDictionary+Merge.m in Sources */,
 				394DCC72164F43C2008A4C50 /* KSCrashDoctor.m in Sources */,
+				C7F3F7A01675ADF900ACF844 /* KSCrashReportSinkBuildozer.m in Sources */,
+				C7B4D7131675CB3D009F6094 /* NSData+Base64.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1037,6 +1059,8 @@
 				39DA83D61618450A001E7F79 /* KSSystemInfo.m in Sources */,
 				39DA84F9161978DE001E7F79 /* NSDictionary+Merge.m in Sources */,
 				394DCC74164F547E008A4C50 /* KSCrashDoctor.m in Sources */,
+				C7F3F7A11675ADF900ACF844 /* KSCrashReportSinkBuildozer.m in Sources */,
+				C7B4D7141675CB3D009F6094 /* NSData+Base64.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

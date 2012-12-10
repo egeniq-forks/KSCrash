@@ -22,7 +22,7 @@
 #import <KSCrash/KSCrashReportSinkEMail.h>
 #import <KSCrash/KSCrashReportSinkQuincy.h>
 #import <KSCrash/KSCrashReportSinkStandard.h>
-
+#import <KSCrash/KSCrashReportSinkBuildozer.h>
 
 
 MAKE_CATEGORIES_LOADABLE(AppDelegate_UI)
@@ -161,7 +161,27 @@ MAKE_CATEGORIES_LOADABLE(AppDelegate_UI)
           };
           [controller.navigationController pushViewController:cmdController animated:YES];
       }]];
-    
+
+    [commands addObject:
+     [CommandEntry commandWithName:@"Send to Buildozer"
+                     accessoryType:UITableViewCellAccessoryNone
+                             block:^(UIViewController* controller)
+      {
+          #pragma unused(controller)
+          NSLog(@"Sending reports to Buildozer...");
+          KSCrash* crashReporter = [KSCrash instance];
+          crashReporter.sink = [KSCrashReportSinkBuildozer sink];
+          [crashReporter sendAllReportsWithCompletion:^(NSArray *filteredReports, BOOL completed, NSError *error) {
+              if (completed) {
+                  NSLog(@"Success.");
+                  [blockSelf showAlertWithTitle:@"Success" message:[NSString stringWithFormat:@"%d reports", [filteredReports count]]];
+              } else {
+                  NSLog(@"Failure. Error = %@", error);
+                  [blockSelf showAlertWithTitle:@"Failure" message:[error localizedDescription]];
+              }
+          }];
+      }]];
+
     [commands addObject:
      [CommandEntry commandWithName:@"Send To Server"
                      accessoryType:UITableViewCellAccessoryDisclosureIndicator
@@ -490,7 +510,7 @@ MAKE_CATEGORIES_LOADABLE(AppDelegate_UI)
                                 }];
           [crashReporter sendAllReportsWithCompletion:nil];
       }]];
-    
+
     return commands;
 }
 
