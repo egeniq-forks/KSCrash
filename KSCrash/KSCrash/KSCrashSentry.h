@@ -37,25 +37,12 @@ extern "C" {
 #endif
 
 
+#include "KSCrashType.h"
+
 #include <mach/mach_types.h>
 #include <signal.h>
 #include <stdbool.h>
 
-
-/** There are 3 ways an iOS app can crash (that we can capture):
- * - Mach kernel exception
- * - Fatal signal
- * - Uncaught Objective-C NSException
- */
-typedef enum
-{
-    KSCrashTypeMachException = 1,
-    KSCrashTypeSignal = 2,
-    KSCrashTypeNSException = 4,
-} KSCrashType;
-
-#define KSCrashTypeAll (KSCrashTypeMachException | KSCrashTypeSignal | KSCrashTypeNSException)
-#define KSCrashTypeAsyncSafe (KSCrashTypeMachException | KSCrashTypeSignal)
 
 typedef enum
 {
@@ -91,8 +78,8 @@ typedef struct KSCrash_SentryContext
     /** True if the crash system has detected a stack overflow. */
     bool isStackOverflow;
 
-    /** The crashed thread. */
-    thread_t crashedThread;
+    /** The thread that caused the problem. */
+    thread_t offendingThread;
 
     /** Address that caused the fault. */
     uintptr_t faultAddress;
@@ -100,6 +87,15 @@ typedef struct KSCrash_SentryContext
     /** The type of crash that occurred.
      * This determines which other fields are valid. */
     KSCrashType crashType;
+
+    /** Short description of why the crash occurred. */
+    const char* crashReason;
+
+    /** The stack trace. */
+    uintptr_t* stackTrace;
+
+    /** Length of the stack trace. */
+    int stackTraceLength;
 
     struct
     {
@@ -118,16 +114,15 @@ typedef struct KSCrash_SentryContext
         /** The exception name. */
         const char* name;
 
-        /** The exception reason. */
-        const char* reason;
-
-        /** The stack trace. */
-        uintptr_t* stackTrace;
-
-        /** Length of the stack trace. */
-        int stackTraceLength;
     } NSException;
 
+    struct
+    {
+        /** The exception name. */
+        const char* name;
+
+    } CPPException;
+    
     struct
     {
         /** User context information. */
@@ -136,6 +131,21 @@ typedef struct KSCrash_SentryContext
         /** Signal information. */
         const siginfo_t* signalInfo;
     } signal;
+
+    struct
+    {
+        /** The exception name. */
+        const char* name;
+
+        /** The line of code where the exception occurred. Can be NULL. */
+        const char* lineOfCode;
+
+        /** The user-supplied custom format stack trace. */
+        const char** customStackTrace;
+
+        /** Length of the stack trace. */
+        int customStackTraceLength;
+    } userException;
 
 } KSCrash_SentryContext;
 
@@ -146,10 +156,13 @@ typedef struct KSCrash_SentryContext
  *
  * @param crashTypes The crash types to install handlers for.
  *
+ * @param onCrash Function to call when a crash occurs.
+ *
  * @return which crash handlers were installed successfully.
  */
 KSCrashType kscrashsentry_installWithContext(KSCrash_SentryContext* context,
-                                             KSCrashType crashTypes);
+                                             KSCrashType crashTypes,
+                                             void (*onCrash)(void));
 
 /** Uninstall crash sentry.
  *

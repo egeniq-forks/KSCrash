@@ -39,7 +39,7 @@ extern "C" {
 
 
 #include <stdbool.h>
-#include <mach/mach_types.h>
+#include <stdint.h>
 
 
 typedef struct
@@ -121,6 +121,10 @@ void kscrashstate_notifyAppTerminate(void);
 /** Notify the crash reporter that the application has crashed.
  */
 void kscrashstate_notifyAppCrash(void);
+
+/** Read-only access into the current state.
+ */
+const KSCrash_State* const kscrashstate_currentState(void);
 
 
 #ifdef __cplusplus

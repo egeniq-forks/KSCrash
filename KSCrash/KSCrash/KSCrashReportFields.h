@@ -37,7 +37,9 @@
 
 #pragma mark - Memory Types -
 
+#define KSCrashMemType_Block               "objc_block"
 #define KSCrashMemType_Class               "objc_class"
+#define KSCrashMemType_NullPointer         "null_pointer"
 #define KSCrashMemType_Object              "objc_object"
 #define KSCrashMemType_String              "string"
 #define KSCrashMemType_Unknown             "unknown"
@@ -45,9 +47,12 @@
 
 #pragma mark - Exception Types -
 
+#define KSCrashExcType_CPPException        "cpp_exception"
+#define KSCrashExcType_Deadlock            "deadlock"
 #define KSCrashExcType_Mach                "mach"
 #define KSCrashExcType_NSException         "nsexception"
 #define KSCrashExcType_Signal              "signal"
+#define KSCrashExcType_User                "user"
 
 
 #pragma mark - Common -
@@ -55,8 +60,11 @@
 #define KSCrashField_Address               "address"
 #define KSCrashField_Contents              "contents"
 #define KSCrashField_Exception             "exception"
+#define KSCrashField_FirstObject           "first_object"
 #define KSCrashField_Index                 "index"
+#define KSCrashField_Ivars                 "ivars"
 #define KSCrashField_Name                  "name"
+#define KSCrashField_ReferencedObject      "referenced_object"
 #define KSCrashField_Type                  "type"
 #define KSCrashField_UUID                  "uuid"
 #define KSCrashField_Value                 "value"
@@ -69,12 +77,12 @@
 
 #define KSCrashField_Class                 "class"
 #define KSCrashField_LastDeallocObject     "last_deallocated_obj"
-#define KSCrashField_MallocSize            "malloc_size"
 
 
 #pragma mark - Backtrace -
 
 #define KSCrashField_InstructionAddr       "instruction_addr"
+#define KSCrashField_LineOfCode            "line_of_code"
 #define KSCrashField_ObjectAddr            "object_addr"
 #define KSCrashField_ObjectName            "object_name"
 #define KSCrashField_SymbolAddr            "symbol_addr"
@@ -122,12 +130,14 @@
 #define KSCrashField_Backtrace             "backtrace"
 #define KSCrashField_Code                  "code"
 #define KSCrashField_CodeName              "code_name"
+#define KSCrashField_CPPException          "cpp_exception"
 #define KSCrashField_ExceptionName         "exception_name"
 #define KSCrashField_Mach                  "mach"
 #define KSCrashField_NSException           "nsexception"
+#define KSCrashField_Reason                "reason"
 #define KSCrashField_Signal                "signal"
 #define KSCrashField_Subcode               "subcode"
-#define KSCrashField_Reason                "reason"
+#define KSCrashField_UserReported          "user_reported"
 
 
 #pragma mark - Process State -

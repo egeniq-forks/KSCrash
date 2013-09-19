@@ -366,8 +366,8 @@ typedef enum
     NSArray* notableAddresses = [crashedThread objectForKey:@KSCrashField_NotableAddresses];
     for(NSDictionary* address in [notableAddresses objectEnumerator])
     {
-        NSString* contents = [address objectForKey:@KSCrashField_Contents];
-        if([contents isEqualToString:@"string"])
+        NSString* type = [address objectForKey:@KSCrashField_Type];
+        if([type isEqualToString:@"string"])
         {
             NSString* value = [address objectForKey:@KSCrashField_Value];
             if([value rangeOfString:@"autorelease pool page"].location != NSNotFound &&
@@ -436,7 +436,7 @@ typedef enum
         }
         else
         {
-            param.type = [notableAddress objectForKey:@KSCrashField_Contents];
+            param.type = [notableAddress objectForKey:@KSCrashField_Type];
             NSString* className = [notableAddress objectForKey:@KSCrashField_Class];
             NSString* previousClass = [notableAddress objectForKey:@KSCrashField_LastDeallocObject];
             NSString* value = [notableAddress objectForKey:@KSCrashField_Value];
@@ -484,6 +484,13 @@ typedef enum
     return [[stack objectForKey:@KSCrashField_Overflow] boolValue];
 }
 
+- (BOOL) isDeadlock:(NSDictionary*) report
+{
+    NSDictionary* errorReport = [self errorReport:report];
+    NSString* crashType = [errorReport objectForKey:@KSCrashField_Type];
+    return [@KSCrashExcType_Deadlock isEqualToString:crashType];
+}
+
 - (NSString*) appendOriginatingCall:(NSString*) string callName:(NSString*) callName
 {
     if(callName != nil && ![callName isEqualToString:@"main"])
@@ -501,6 +508,11 @@ typedef enum
         NSDictionary* crashedThreadReport = [self crashedThreadReport:report];
         NSDictionary* errorReport = [self errorReport:report];
 
+        if([self isDeadlock:report])
+        {
+            return [NSString stringWithFormat:@"Main thread deadlocked in %@", lastFunctionName];
+        }
+        
         if([self isStackOverflow:crashedThreadReport])
         {
             return [NSString stringWithFormat:@"Stack overflow in %@", lastFunctionName];

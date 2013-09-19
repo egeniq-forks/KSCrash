@@ -40,9 +40,8 @@
 
 #warning KSZombie must be compiled with ARC disabled.
 
-void kszombie_install(unsigned int cacheSize)
+void kszombie_install(__unused size_t cacheSize)
 {
-    #pragma unused(cacheSize)
     NSLog(@"Error: KSZombie must be compiled with ARC disabled. You may use ARC"
           " in your app, but you must compile this library without ARC.");
 }
@@ -51,9 +50,8 @@ void kszombie_uninstall(void)
 {
 }
 
-const char* kszombie_className(const void* object)
+const char* kszombie_className(__unused const void* object)
 {
-    #pragma unused(object)
     return NULL;
 }
 
@@ -66,7 +64,7 @@ typedef struct
 } Zombie;
 
 static Zombie* g_zombieCache;
-static unsigned int g_zombieHashMask;
+static size_t g_zombieHashMask;
 
 static struct
 {
@@ -79,14 +77,14 @@ static struct
 } g_lastDeallocedException;
 static const NSUInteger g_callStackSize = sizeof(g_lastDeallocedException.callStack) / sizeof(*g_lastDeallocedException.callStack);
 
-static inline unsigned int hashIndex(const id object)
+static inline size_t hashIndex(const id object)
 {
     uintptr_t objPtr = (uintptr_t)object;
     objPtr >>= (sizeof(object)-1);
     return objPtr & g_zombieHashMask;
 }
 
-static inline bool isPowerOf2(const unsigned int value)
+static inline bool isPowerOf2(const size_t value)
 {
     return value && !(value & (value - 1));
 }
@@ -116,9 +114,12 @@ static inline void handleDealloc(id self)
     zombie->object = self;
     Class class = object_getClass(self);
     zombie->className = class_getName(class);
-    unlikely_if(class == g_lastDeallocedException.class)
+    for(; class != nil; class = class_getSuperclass(class))
     {
-        storeException(self);
+        unlikely_if(class == g_lastDeallocedException.class)
+        {
+            storeException(self);
+        }
     }
 }
 
@@ -140,7 +141,7 @@ static void swizzleDealloc(Class cls)
                                    class_getClassMethod(cls, @selector(dealloc_KSZombieOrig)));
 }
 
-void kszombie_install(unsigned int cacheSize)
+void kszombie_install(size_t cacheSize)
 {
     if(g_zombieCache != NULL)
     {
@@ -156,7 +157,7 @@ void kszombie_install(unsigned int cacheSize)
 
     if(!isPowerOf2(cacheSize))
     {
-        NSLog(@"Error: %d is not a power of 2. KSZombie NOT installed!", cacheSize);
+        NSLog(@"Error: %ld is not a power of 2. KSZombie NOT installed!", cacheSize);
         return;
     }
 
@@ -164,8 +165,8 @@ void kszombie_install(unsigned int cacheSize)
     g_zombieCache = calloc(cacheSize, sizeof(*g_zombieCache));
     if(g_zombieCache == NULL)
     {
-        NSLog(@"Error: Could not allocate %d bytes of memory. KSZombie NOT installed!",
-              cacheSize * (unsigned int)sizeof(*g_zombieCache));
+        NSLog(@"Error: Could not allocate %ld bytes of memory. KSZombie NOT installed!",
+              cacheSize * sizeof(*g_zombieCache));
         return;
     }
 
@@ -198,7 +199,7 @@ void kszombie_uninstall(void)
 
 const char* kszombie_className(const void* object)
 {
-    if(g_zombieCache == NULL)
+    if(g_zombieCache == NULL || object == NULL)
     {
         return NULL;
     }
@@ -231,7 +232,7 @@ const uintptr_t* kszombie_lastDeallocedNSExceptionCallStack(void)
     return g_lastDeallocedException.callStack;
 }
 
-const unsigned int kszombie_lastDeallocedNSExceptionCallStackLength(void)
+const size_t kszombie_lastDeallocedNSExceptionCallStackLength(void)
 {
     return g_lastDeallocedException.callStackLength;
 }

@@ -60,7 +60,7 @@ extern "C" {
  * @param cacheSize The size of the zombie cache. Must be a multiple of 2 and
  *                  greater than 1.
  */
-void kszombie_install(unsigned int cacheSize);
+void kszombie_install(size_t cacheSize);
 
 /** Uninstall the zombie tracker.
  */
@@ -102,7 +102,7 @@ const uintptr_t* kszombie_lastDeallocedNSExceptionCallStack(void);
  *
  * @return The call stack length.
  */
-const unsigned int kszombie_lastDeallocedNSExceptionCallStackLength(void);
+const size_t kszombie_lastDeallocedNSExceptionCallStackLength(void);
 
 
 #ifdef __cplusplus
