@@ -27,15 +27,15 @@
 
 #include "KSMach.h"
 
+#include "KSMachApple.h"
+
 //#define KSLogger_LocalLevel TRACE
 #include "KSLogger.h"
 
-#include <dispatch/dispatch.h>
 #include <errno.h>
 #include <mach-o/arch.h>
 #include <mach/mach_time.h>
 #include <mach/vm_map.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/sysctl.h>
@@ -54,6 +54,7 @@
 bool ksmach_i_VMStats(vm_statistics_data_t* const vmStats,
                       vm_size_t* const pageSize);
 
+static pthread_t g_topThread;
 
 // ============================================================================
 #pragma mark - General Information -
@@ -90,22 +91,22 @@ const char* ksmach_currentCPUArch(void)
     return archInfo == NULL ? NULL : archInfo->name;
 }
 
+#define RETURN_NAME_FOR_ENUM(A) case A: return #A
+
 const char* ksmach_exceptionName(const exception_type_t exceptionType)
 {
     switch (exceptionType)
     {
-        case EXC_BAD_ACCESS:      return "EXC_BAD_ACCESS";
-        case EXC_BAD_INSTRUCTION: return "EXC_BAD_INSTRUCTION";
-        case EXC_ARITHMETIC:      return "EXC_ARITHMETIC";
-        case EXC_EMULATION:       return "EXC_EMULATION";
-        case EXC_SOFTWARE:        return "EXC_SOFTWARE";
-        case EXC_BREAKPOINT:      return "EXC_BREAKPOINT";
-        case EXC_SYSCALL:         return "EXC_SYSCALL";
-        case EXC_MACH_SYSCALL:    return "EXC_MACH_SYSCALL";
-        case EXC_RPC_ALERT:       return "EXC_RPC_ALERT";
-        case EXC_CRASH:           return "EXC_CRASH";
-        default:
-            break;
+            RETURN_NAME_FOR_ENUM(EXC_BAD_ACCESS);
+            RETURN_NAME_FOR_ENUM(EXC_BAD_INSTRUCTION);
+            RETURN_NAME_FOR_ENUM(EXC_ARITHMETIC);
+            RETURN_NAME_FOR_ENUM(EXC_EMULATION);
+            RETURN_NAME_FOR_ENUM(EXC_SOFTWARE);
+            RETURN_NAME_FOR_ENUM(EXC_BREAKPOINT);
+            RETURN_NAME_FOR_ENUM(EXC_SYSCALL);
+            RETURN_NAME_FOR_ENUM(EXC_MACH_SYSCALL);
+            RETURN_NAME_FOR_ENUM(EXC_RPC_ALERT);
+            RETURN_NAME_FOR_ENUM(EXC_CRASH);
     }
     return NULL;
 }
@@ -114,57 +115,57 @@ const char* ksmach_kernelReturnCodeName(const kern_return_t returnCode)
 {
     switch (returnCode)
     {
-        case KERN_SUCCESS:                return "KERN_SUCCESS";                //  0
-        case KERN_INVALID_ADDRESS:        return "KERN_INVALID_ADDRESS";        //  1
-        case KERN_PROTECTION_FAILURE:     return "KERN_PROTECTION_FAILURE";     //  2
-        case KERN_NO_SPACE:               return "KERN_NO_SPACE";               //  3
-        case KERN_INVALID_ARGUMENT:       return "KERN_INVALID_ARGUMENT";       //  4
-        case KERN_FAILURE:                return "KERN_FAILURE";                //  5
-        case KERN_RESOURCE_SHORTAGE:      return "KERN_RESOURCE_SHORTAGE";      //  6
-        case KERN_NOT_RECEIVER:           return "KERN_NOT_RECEIVER";           //  7
-        case KERN_NO_ACCESS:              return "KERN_NO_ACCESS";              //  8
-        case KERN_MEMORY_FAILURE:         return "KERN_MEMORY_FAILURE";         //  9
-        case KERN_MEMORY_ERROR:           return "KERN_MEMORY_ERROR";           // 10
-        case KERN_ALREADY_IN_SET:         return "KERN_ALREADY_IN_SET";         // 11
-        case KERN_NOT_IN_SET:             return "KERN_NOT_IN_SET";             // 12
-        case KERN_NAME_EXISTS:            return "KERN_NAME_EXISTS";            // 13
-        case KERN_ABORTED:                return "KERN_ABORTED";                // 14
-        case KERN_INVALID_NAME:           return "KERN_INVALID_NAME";           // 15
-        case KERN_INVALID_TASK:           return "KERN_INVALID_TASK";           // 16
-        case KERN_INVALID_RIGHT:          return "KERN_INVALID_RIGHT";          // 17
-        case KERN_INVALID_VALUE:          return "KERN_INVALID_VALUE";          // 18
-        case KERN_UREFS_OVERFLOW:         return "KERN_UREFS_OVERFLOW";         // 19
-        case KERN_INVALID_CAPABILITY:     return "KERN_INVALID_CAPABILITY";     // 20
-        case KERN_RIGHT_EXISTS:           return "KERN_RIGHT_EXISTS";           // 21
-        case KERN_INVALID_HOST:           return "KERN_INVALID_HOST";           // 22
-        case KERN_MEMORY_PRESENT:         return "KERN_MEMORY_PRESENT";         // 23
-        case KERN_MEMORY_DATA_MOVED:      return "KERN_MEMORY_DATA_MOVED";      // 24
-        case KERN_MEMORY_RESTART_COPY:    return "KERN_MEMORY_RESTART_COPY";    // 25
-        case KERN_INVALID_PROCESSOR_SET:  return "KERN_INVALID_PROCESSOR_SET";  // 26
-        case KERN_POLICY_LIMIT:           return "KERN_POLICY_LIMIT";           // 27
-        case KERN_INVALID_POLICY:         return "KERN_INVALID_POLICY";         // 28
-        case KERN_INVALID_OBJECT:         return "KERN_INVALID_OBJECT";         // 29
-        case KERN_ALREADY_WAITING:        return "KERN_ALREADY_WAITING";        // 30
-        case KERN_DEFAULT_SET:            return "KERN_DEFAULT_SET";            // 31
-        case KERN_EXCEPTION_PROTECTED:    return "KERN_EXCEPTION_PROTECTED";    // 32
-        case KERN_INVALID_LEDGER:         return "KERN_INVALID_LEDGER";         // 33
-        case KERN_INVALID_MEMORY_CONTROL: return "KERN_INVALID_MEMORY_CONTROL"; // 34
-        case KERN_INVALID_SECURITY:       return "KERN_INVALID_SECURITY";       // 35
-        case KERN_NOT_DEPRESSED:          return "KERN_NOT_DEPRESSED";          // 36
-        case KERN_TERMINATED:             return "KERN_TERMINATED";             // 37
-        case KERN_LOCK_SET_DESTROYED:     return "KERN_LOCK_SET_DESTROYED";     // 38
-        case KERN_LOCK_UNSTABLE:          return "KERN_LOCK_UNSTABLE";          // 39
-        case KERN_LOCK_OWNED:             return "KERN_LOCK_OWNED";             // 40
-        case KERN_LOCK_OWNED_SELF:        return "KERN_LOCK_OWNED_SELF";        // 41
-        case KERN_SEMAPHORE_DESTROYED:    return "KERN_SEMAPHORE_DESTROYED";    // 42
-        case KERN_RPC_SERVER_TERMINATED:  return "KERN_RPC_SERVER_TERMINATED";  // 43
-        case KERN_RPC_TERMINATE_ORPHAN:   return "KERN_RPC_TERMINATE_ORPHAN";   // 44
-        case KERN_RPC_CONTINUE_ORPHAN:    return "KERN_RPC_CONTINUE_ORPHAN";    // 45
-        case KERN_NOT_SUPPORTED:          return "KERN_NOT_SUPPORTED";          // 46
-        case KERN_NODE_DOWN:              return "KERN_NODE_DOWN";              // 47
-        case KERN_NOT_WAITING:            return "KERN_NOT_WAITING";            // 48
-        case KERN_OPERATION_TIMED_OUT:    return "KERN_OPERATION_TIMED_OUT";    // 49
-        case KERN_CODESIGN_ERROR:         return "KERN_CODESIGN_ERROR";         // 50
+            RETURN_NAME_FOR_ENUM(KERN_SUCCESS);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_ADDRESS);
+            RETURN_NAME_FOR_ENUM(KERN_PROTECTION_FAILURE);
+            RETURN_NAME_FOR_ENUM(KERN_NO_SPACE);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_ARGUMENT);
+            RETURN_NAME_FOR_ENUM(KERN_FAILURE);
+            RETURN_NAME_FOR_ENUM(KERN_RESOURCE_SHORTAGE);
+            RETURN_NAME_FOR_ENUM(KERN_NOT_RECEIVER);
+            RETURN_NAME_FOR_ENUM(KERN_NO_ACCESS);
+            RETURN_NAME_FOR_ENUM(KERN_MEMORY_FAILURE);
+            RETURN_NAME_FOR_ENUM(KERN_MEMORY_ERROR);
+            RETURN_NAME_FOR_ENUM(KERN_ALREADY_IN_SET);
+            RETURN_NAME_FOR_ENUM(KERN_NOT_IN_SET);
+            RETURN_NAME_FOR_ENUM(KERN_NAME_EXISTS);
+            RETURN_NAME_FOR_ENUM(KERN_ABORTED);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_NAME);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_TASK);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_RIGHT);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_VALUE);
+            RETURN_NAME_FOR_ENUM(KERN_UREFS_OVERFLOW);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_CAPABILITY);
+            RETURN_NAME_FOR_ENUM(KERN_RIGHT_EXISTS);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_HOST);
+            RETURN_NAME_FOR_ENUM(KERN_MEMORY_PRESENT);
+            RETURN_NAME_FOR_ENUM(KERN_MEMORY_DATA_MOVED);
+            RETURN_NAME_FOR_ENUM(KERN_MEMORY_RESTART_COPY);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_PROCESSOR_SET);
+            RETURN_NAME_FOR_ENUM(KERN_POLICY_LIMIT);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_POLICY);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_OBJECT);
+            RETURN_NAME_FOR_ENUM(KERN_ALREADY_WAITING);
+            RETURN_NAME_FOR_ENUM(KERN_DEFAULT_SET);
+            RETURN_NAME_FOR_ENUM(KERN_EXCEPTION_PROTECTED);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_LEDGER);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_MEMORY_CONTROL);
+            RETURN_NAME_FOR_ENUM(KERN_INVALID_SECURITY);
+            RETURN_NAME_FOR_ENUM(KERN_NOT_DEPRESSED);
+            RETURN_NAME_FOR_ENUM(KERN_TERMINATED);
+            RETURN_NAME_FOR_ENUM(KERN_LOCK_SET_DESTROYED);
+            RETURN_NAME_FOR_ENUM(KERN_LOCK_UNSTABLE);
+            RETURN_NAME_FOR_ENUM(KERN_LOCK_OWNED);
+            RETURN_NAME_FOR_ENUM(KERN_LOCK_OWNED_SELF);
+            RETURN_NAME_FOR_ENUM(KERN_SEMAPHORE_DESTROYED);
+            RETURN_NAME_FOR_ENUM(KERN_RPC_SERVER_TERMINATED);
+            RETURN_NAME_FOR_ENUM(KERN_RPC_TERMINATE_ORPHAN);
+            RETURN_NAME_FOR_ENUM(KERN_RPC_CONTINUE_ORPHAN);
+            RETURN_NAME_FOR_ENUM(KERN_NOT_SUPPORTED);
+            RETURN_NAME_FOR_ENUM(KERN_NODE_DOWN);
+            RETURN_NAME_FOR_ENUM(KERN_NOT_WAITING);
+            RETURN_NAME_FOR_ENUM(KERN_OPERATION_TIMED_OUT);
+            RETURN_NAME_FOR_ENUM(KERN_CODESIGN_ERROR);
     }
     return NULL;
 }
@@ -191,239 +192,139 @@ bool ksmach_fillState(const thread_t thread,
     return true;
 }
 
-
-// From Libc-763.11/pthreads/pthread_internals.h
-#define kEXTERNAL_POSIX_THREAD_KEYS_MAX 512
-#define kINTERNAL_POSIX_THREAD_KEYS_MAX 256
-
-#define kTSD_KEY_COUNT (kEXTERNAL_POSIX_THREAD_KEYS_MAX + \
-                        kINTERNAL_POSIX_THREAD_KEYS_MAX)
-
-// From Libc-763.11/pthreads/pthread_internals.h
-typedef struct internal_pthread
+void ksmach_init(void)
 {
-    long        sig;           /* Unique signature for this structure */
-    struct __darwin_pthread_handler_rec* __cleanup_stack;
-    int lock;                  /* Used for internal mutex on structure (actually pthread_lock_t) */
-    uint32_t    detached:8,
-                inherit:8,
-                policy:8,
-                freeStackOnExit:1,
-                newstyle:1,
-                kernalloc:1,
-                schedset:1,
-                wqthread:1,
-                wqkillset:1,
-                pad:2;
-    size_t      guardsize;     /* size in bytes to guard stack overflow */
-#if  !defined(__LP64__)
-    int         pad0;          /* for backwards compatibility */
-#endif
-    struct sched_param param;
-    uint32_t    cancel_error;
-#if defined(__LP64__)
-    uint32_t    cancel_pad;    /* pad value for alignment */
-#endif
-    struct _pthread* joiner;
-#if !defined(__LP64__)
-    int         pad1;          /* for backwards compatibility */
-#endif
-    void*       exit_value;
-    semaphore_t death;         /* pthread_join() uses this to wait for death's call */
-    mach_port_t kernel_thread; /* kernel thread this thread is bound to */
-    void*       (*fun)(void*); /* Thread start routine */
-    void*       arg;           /* Argment for thread start routine */
-    int         cancel_state;  /* Whether thread can be cancelled */
-    int         err_no;        /* thread-local errno */
-    void*       tsd[kTSD_KEY_COUNT]; /* Thread specific data */
-    // Don't care about the rest.
-}* internal_pthread_t;
+    static volatile sig_atomic_t initialized = 0;
+    if(!initialized)
+    {
+        kern_return_t kr;
+        const task_t thisTask = mach_task_self();
+        thread_act_array_t threads;
+        mach_msg_type_number_t numThreads;
 
+        if((kr = task_threads(thisTask, &threads, &numThreads)) != KERN_SUCCESS)
+        {
+            KSLOG_ERROR("task_threads: %s", mach_error_string(kr));
+            return;
+        }
 
-// From libdispatch-187.5/src/queue_internal.h
-#define kDISPATCH_QUEUE_MIN_LABEL_SIZE 64
+        g_topThread = pthread_from_mach_thread_np(threads[0]);
 
-// From libdispatch-187.5/src/queue_internal.h
-typedef struct internal_dispatch_queue_s
+        for(mach_msg_type_number_t i = 0; i < numThreads; i++)
+        {
+            mach_port_deallocate(thisTask, threads[i]);
+        }
+        vm_deallocate(thisTask, (vm_address_t)threads, sizeof(thread_t) * numThreads);
+        initialized = true;
+    }
+}
+
+thread_t ksmach_machThreadFromPThread(const pthread_t pthread)
 {
-    // DISPATCH_STRUCT_HEADER (object_internal.h)
-    const struct dispatch_queue_vtable_s* do_vtable;
-    struct dispatch_queue_s* volatile do_next;
-    int do_ref_cnt;     // Was unsigned int in queue_internal.h
-    int do_xref_cnt;    // Was unsigned int in queue_internal.h
-    int do_suspend_cnt; // Was unsigned int in queue_internal.h
-    struct dispatch_queue_s* do_targetq;
-    void* do_ctxt;
-    void* do_finalizer;
+    const internal_pthread_t threadStruct = (internal_pthread_t)pthread;
+    thread_t machThread = 0;
+    if(ksmach_copyMem(&threadStruct->kernel_thread, &machThread, sizeof(machThread)) != KERN_SUCCESS)
+    {
+        KSLOG_TRACE("Could not copy mach thread from %p", threadStruct->kernel_thread);
+        return 0;
+    }
+    return machThread;
+}
 
-    // DISPATCH_QUEUE_HEADER
-    uint32_t volatile dq_running;
-    uint32_t dq_width;
-    struct dispatch_queue_s* volatile dq_items_tail;
-    struct dispatch_queue_s* volatile dq_items_head;
-    unsigned long dq_serialnum;
-    dispatch_queue_t dq_specific_q;
-
-    char dq_label[kDISPATCH_QUEUE_MIN_LABEL_SIZE]; // must be last
-    // char _dq_pad[DISPATCH_QUEUE_CACHELINE_PAD];
-}* internal_dispatch_queue_t;
-
-typedef struct internal_dispatch_queue_vtable_s
+pthread_t ksmach_pthreadFromMachThread(const thread_t thread)
 {
-	unsigned long const do_type;
-	const char *const do_kind;
-	size_t (*const do_debug)(struct dispatch_queue_vtable_s *, char *, size_t);
-	struct dispatch_queue_s *(*const do_invoke)(struct dispatch_queue_vtable_s *);
-	bool (*const do_probe)(struct dispatch_queue_vtable_s *);
-	void (*const do_dispose)(struct dispatch_queue_vtable_s *);
-}* internal_dispatch_queue_vtable_t;
+    internal_pthread_t threadStruct = (internal_pthread_t)g_topThread;
+    thread_t machThread = 0;
 
+    for(int i = 0; i < 50; i++)
+    {
+        if(ksmach_copyMem(&threadStruct->kernel_thread, &machThread, sizeof(machThread)) != KERN_SUCCESS)
+        {
+            break;
+        }
+        if(machThread == thread)
+        {
+            return (pthread_t)threadStruct;
+        }
+
+        if(ksmach_copyMem(&threadStruct->plist.tqe_next, &threadStruct, sizeof(threadStruct)) != KERN_SUCCESS)
+        {
+            break;
+        }
+    }
+    return 0;
+}
+
+bool ksmach_getThreadName(const thread_t thread,
+                          char* const buffer,
+                          size_t bufLength)
+{
+    const pthread_t pthread = ksmach_pthreadFromMachThread(thread);
+    const internal_pthread_t threadStruct = (internal_pthread_t)pthread;
+    size_t copyLength = bufLength > MAXTHREADNAMESIZE ? MAXTHREADNAMESIZE : bufLength;
+
+    if(ksmach_copyMem(threadStruct->pthread_name, buffer, copyLength) != KERN_SUCCESS)
+    {
+        KSLOG_TRACE("Could not copy thread name from %p", threadStruct->pthread_name);
+        return false;
+    }
+    buffer[copyLength-1] = 0;
+    return true;
+}
 
 bool ksmach_getThreadQueueName(const thread_t thread,
                                char* const buffer,
                                size_t bufLength)
 {
-    // "Bad mojo" barely begins to describe what I'm about to do here.
-    //
-    // We want the dispatch queue name for a thread, but we can't get at
-    // it for an arbitraty thread via any public API, so this calls for a
-    // little creative hacking.
-    //
-    // Dispatch queues have a label associated with them, but you can only get
-    // the dispatch queue associated with the CURRENT thread, not an arbitrary
-    // thread. This is because internally, the queue is stored as
-    // thread-specific data, and the pthreads public API can only access
-    // thread-specific data for the current thread. Besides this, the TSD key
-    // for each queue is only known to the dispatch queue subsystem.
-    //
-    // The only way around this is to recast thread_t as a pointer to a
-    // non-opaque structure, step through what we think is its TSD array,
-    // reinterpret THOSE pointers (which could be anything really) as non-opaque
-    // queue structures, determine if they really are queues and not some other
-    // data structure or invalid address or random bytes, and finally copy what
-    // we think are their labels. AND we must do all of this without crashing.
-    //
-    // Yeah, that's right. Shit just got real.
-    //
-    // Fortunately, there's vm_read_overwrite() to lend a helping hand.
-    //
-    // The basic process is:
-    //
-    // 1. Reinterpret thread_t as internal_pthread_t.
-    // 2. Copy the thread-specific data pointers.
-    // 3. For each pointer, try to interpret as internal_dispatch_queue_t and
-    //    copy its contents.
-    // 4. Do some sanity checks to make sure it really is a dispatch queue
-    //    we're looking at.
-    // 5. Copy the queue label.
-    //
-    // Ready? Let's fumble our way through some random memory!
-
-
-    // Space to copy what we hope is thread-specific data.
-    void* tsd;
-
-    // Space to copy data from what we hope is a queue.
+    struct internal_dispatch_queue_s* pQueue;
     struct internal_dispatch_queue_s queue;
-    struct internal_dispatch_queue_s tmpQueue;
-    struct internal_dispatch_queue_vtable_s tmpVTable;
+
     if(bufLength > sizeof(queue.dq_label))
     {
         bufLength = sizeof(queue.dq_label);
     }
 
     // Recast the opaque thread to our hacky internal thread structure pointer.
-    const pthread_t pthread = pthread_from_mach_thread_np(thread);
-    const internal_pthread_t const threadStruct = (internal_pthread_t)pthread;
+    const pthread_t pthread = ksmach_pthreadFromMachThread(thread);
+    const internal_pthread_t threadStruct = (internal_pthread_t)pthread;
 
-    KSLOG_TRACE("Getting queue name for thread %d", thread);
-
-    // Step through thread specific data.
-    for(int iTSD = 0; iTSD < kTSD_KEY_COUNT; iTSD++)
+    if(ksmach_copyMem(&threadStruct->tsd[dispatch_queue_key], &pQueue, sizeof(pQueue)) != KERN_SUCCESS)
     {
-        // Copy what might be a valid pointer from the thread-specific data.
-        if(ksmach_copyMem(&threadStruct->tsd[iTSD], &tsd, sizeof(tsd)) != KERN_SUCCESS)
-        {
-            KSLOG_TRACE("Could not copy thread-specific data pointer from %p", &threadStruct->tsd[iTSD]);
-            continue;
-        }
-        if(tsd == NULL)
-        {
-            KSLOG_TRACE("TSD pointer is NULL");
-            continue;
-        }
-
-        // Follow the potential pointer to copy what might be a queue structure.
-        if(ksmach_copyMem(tsd, &queue, sizeof(queue)) != KERN_SUCCESS)
-        {
-            KSLOG_TRACE("Could not copy queue data from %p", tsd);
-            continue;
-        }
-
-        // Sanity checks follow
-
-        // do_vtable and do_targetq must either be null or point to valid data.
-        if(queue.do_vtable != NULL && ksmach_copyMem(queue.do_vtable, &tmpVTable, sizeof(tmpVTable)) != KERN_SUCCESS)
-        {
-            KSLOG_TRACE("Could not copy vtable data from %p", queue.do_vtable);
-            continue;
-        }
-
-        if(queue.do_targetq != NULL && ksmach_copyMem(queue.do_targetq, &tmpQueue, sizeof(tmpQueue)) != KERN_SUCCESS)
-        {
-            KSLOG_TRACE("Could not copy queue data from %p", queue.do_targetq);
-            continue;
-        }
-        
-        // Wueue label must be a null terminated string.
-        int iLabel;
-        for(iLabel = 0; iLabel < (int)sizeof(queue.dq_label); iLabel++)
-        {
-            if(queue.dq_label[iLabel] < ' ' || queue.dq_label[iLabel] > '~')
-            {
-                break;
-            }
-        }
-        if(queue.dq_label[iLabel] != 0)
-        {
-            // Found a non-null, invalid char.
-            KSLOG_TRACE("Queue label contains invalid chars");
-            continue;
-        }
-
-        // Label length < 5 is probably invalid.
-        if(iLabel < 5)
-        {
-            KSLOG_TRACE("Queue label is of length %d", iLabel);
-            continue;
-        }
-
-        // Counts are never higher than INT_MAX and dq_running must be either 0,
-        // 1, or 2.
-        if(queue.do_ref_cnt < -1 ||
-           queue.do_xref_cnt < -1 ||
-           queue.do_suspend_cnt < -1 ||
-           queue.dq_running > 2)
-        {
-            KSLOG_TRACE("Failed sanity check:\n"
-                        "do_ref_count = %d\n"
-                        "do_xref_cnt = %d\n"
-                        "do_suspend_cnt = %d\n"
-                        "dq_running = %d\n",
-                        queue.do_ref_cnt,
-                        queue.do_xref_cnt,
-                        queue.do_suspend_cnt,
-                        queue.dq_running);
-            continue;
-        }
-
-        // If all checks passed, we probably have a valid queue label.
-        strncpy(buffer, queue.dq_label, bufLength);
-        KSLOG_TRACE("Queue label = %s", buffer);
-        return true;
+        KSLOG_TRACE("Could not copy queue pointer from %p", &threadStruct->tsd[dispatch_queue_key]);
+        return false;
     }
 
-    return false;
+    if(pQueue == NULL)
+    {
+        KSLOG_TRACE("Queue pointer is NULL");
+        return false;
+    }
+
+    if(ksmach_copyMem(pQueue, &queue, sizeof(queue)) != KERN_SUCCESS)
+    {
+        KSLOG_TRACE("Could not copy queue data from %p", pQueue);
+        return false;
+    }
+
+    // Queue label must be a null terminated string.
+    int iLabel;
+    for(iLabel = 0; iLabel < (int)sizeof(queue.dq_label); iLabel++)
+    {
+        if(queue.dq_label[iLabel] < ' ' || queue.dq_label[iLabel] > '~')
+        {
+            break;
+        }
+    }
+    if(queue.dq_label[iLabel] != 0)
+    {
+        // Found a non-null, invalid char.
+        KSLOG_TRACE("Queue label contains invalid chars");
+        return false;
+    }
+
+    strncpy(buffer, queue.dq_label, bufLength);
+    KSLOG_TRACE("Queue label = %s", buffer);
+    return true;
 }
 
 
@@ -730,6 +631,6 @@ bool ksmach_i_VMStats(vm_statistics_data_t* const vmStats,
         KSLOG_ERROR("host_statistics: %s", mach_error_string(kr));
         return false;
     }
-
+    
     return true;
 }

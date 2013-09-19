@@ -28,9 +28,12 @@
 #include "KSCrashSentry.h"
 #include "KSCrashSentry_Private.h"
 
+#include "KSCrashSentry_Deadlock.h"
 #include "KSCrashSentry_MachException.h"
+#include "KSCrashSentry_CPPException.h"
 #include "KSCrashSentry_NSException.h"
 #include "KSCrashSentry_Signal.h"
+#include "KSCrashSentry_User.h"
 #include "KSMach.h"
 
 //#define KSLogger_LocalLevel TRACE
@@ -40,6 +43,48 @@
 // ============================================================================
 #pragma mark - Globals -
 // ============================================================================
+
+typedef struct
+{
+    KSCrashType crashType;
+    bool (*install)(KSCrash_SentryContext* context);
+    void (*uninstall)(void);
+} CrashSentry;
+
+static CrashSentry g_sentries[] =
+{
+    {
+        KSCrashTypeMachException,
+        kscrashsentry_installMachHandler,
+        kscrashsentry_uninstallMachHandler,
+    },
+    {
+        KSCrashTypeSignal,
+        kscrashsentry_installSignalHandler,
+        kscrashsentry_uninstallSignalHandler,
+    },
+    {
+        KSCrashTypeCPPException,
+        kscrashsentry_installCPPExceptionHandler,
+        kscrashsentry_uninstallCPPExceptionHandler,
+    },
+    {
+        KSCrashTypeNSException,
+        kscrashsentry_installNSExceptionHandler,
+        kscrashsentry_uninstallNSExceptionHandler,
+    },
+    {
+        KSCrashTypeMainThreadDeadlock,
+        kscrashsentry_installDeadlockHandler,
+        kscrashsentry_uninstallDeadlockHandler,
+    },
+    {
+        KSCrashTypeUserReported,
+        kscrashsentry_installUserExceptionHandler,
+        kscrashsentry_uninstallUserExceptionHandler,
+    },
+};
+static size_t g_sentriesCount = sizeof(g_sentries) / sizeof(*g_sentries);
 
 /** Context to fill with crash information. */
 static KSCrash_SentryContext* g_context = NULL;
@@ -55,25 +100,25 @@ static bool g_threads_are_running = true;
 // ============================================================================
 
 KSCrashType kscrashsentry_installWithContext(KSCrash_SentryContext* context,
-                                             KSCrashType crashTypes)
+                                             KSCrashType crashTypes,
+                                             void (*onCrash)(void))
 {
     KSLOG_DEBUG("Installing handlers with context %p, crash types 0x%x.", context, crashTypes);
     g_context = context;
-
-    context->handlingCrash = false;
+    kscrashsentry_clearContext(g_context);
+    g_context->onCrash = onCrash;
 
     KSCrashType installed = 0;
-    if((crashTypes & KSCrashTypeMachException) && kscrashsentry_installMachHandler(context))
+    for(size_t i = 0; i < g_sentriesCount; i++)
     {
-        installed |= KSCrashTypeMachException;
-    }
-    if((crashTypes & KSCrashTypeSignal) && kscrashsentry_installSignalHandler(context))
-    {
-        installed |= KSCrashTypeSignal;
-    }
-    if((crashTypes & KSCrashTypeNSException) && kscrashsentry_installNSExceptionHandler(context))
-    {
-        installed |= KSCrashTypeNSException;
+        CrashSentry* sentry = &g_sentries[i];
+        if(sentry->crashType & crashTypes)
+        {
+            if(sentry->install == NULL || sentry->install(context))
+            {
+                installed |= sentry->crashType;
+            }
+        }
     }
 
     KSLOG_DEBUG("Installation complete. Installed types 0x%x.", installed);
@@ -83,17 +128,16 @@ KSCrashType kscrashsentry_installWithContext(KSCrash_SentryContext* context,
 void kscrashsentry_uninstall(KSCrashType crashTypes)
 {
     KSLOG_DEBUG("Uninstalling handlers with crash types 0x%x.", crashTypes);
-    if(crashTypes & KSCrashTypeMachException)
+    for(size_t i = 0; i < g_sentriesCount; i++)
     {
-        kscrashsentry_uninstallMachHandler();
-    }
-    if(crashTypes & KSCrashTypeSignal)
-    {
-        kscrashsentry_uninstallSignalHandler();
-    }
-    if(crashTypes & KSCrashTypeNSException)
-    {
-        kscrashsentry_uninstallNSExceptionHandler();
+        CrashSentry* sentry = &g_sentries[i];
+        if(sentry->crashType & crashTypes)
+        {
+            if(sentry->install != NULL)
+            {
+                sentry->uninstall();
+            }
+        }
     }
     KSLOG_DEBUG("Uninstall complete.");
 }
@@ -163,4 +207,17 @@ void kscrashsentry_resumeThreads(void)
         }
     }
     KSLOG_DEBUG("Resume complete.");
+}
+
+void kscrashsentry_clearContext(KSCrash_SentryContext* context)
+{
+    void (*onCrash)(void) = context->onCrash;
+    memset(context, 0, sizeof(*context));
+    context->onCrash = onCrash;
+}
+
+void kscrashsentry_beginHandlingCrash(KSCrash_SentryContext* context)
+{
+    kscrashsentry_clearContext(context);
+    context->handlingCrash = true;
 }
