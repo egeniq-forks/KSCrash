@@ -91,16 +91,14 @@
         return @"";
     }
 
-    char* value = malloc(size);
+    NSMutableData* value = [NSMutableData dataWithLength:size];
 
     if(kssysctl_stringForName([name cStringUsingEncoding:NSUTF8StringEncoding],
-                              value,
+                              value.mutableBytes,
                               size) != 0)
     {
-        str = [NSString stringWithCString:value encoding:NSUTF8StringEncoding];
+        str = [NSString stringWithCString:value.mutableBytes encoding:NSUTF8StringEncoding];
     }
-
-    free(value);
 
     return str;
 }
@@ -170,12 +168,17 @@
  */
 + (NSString*) deviceAndAppHash
 {
-    NSMutableData* data = [NSMutableData dataWithLength:6];
+    NSMutableData* data = nil;
 
-    // Get the MAC address.
-    if(!kssysctl_getMacAddress("en0", [data mutableBytes]))
+    if([[UIDevice currentDevice] respondsToSelector:@selector(identifierForVendor)])
     {
-        return nil;
+        data = [NSMutableData dataWithLength:16];
+        [[UIDevice currentDevice].identifierForVendor getUUIDBytes:data.mutableBytes];
+    }
+    else
+    {
+        data = [NSMutableData dataWithLength:6];
+        kssysctl_getMacAddress("en0", [data mutableBytes]);
     }
 
     // Append some device-specific data.
@@ -193,7 +196,7 @@
 
     // SHA the whole thing.
     uint8_t sha[CC_SHA1_DIGEST_LENGTH];
-    CC_SHA1([data bytes], [data length], sha);
+    CC_SHA1([data bytes], (CC_LONG)[data length], sha);
 
     NSMutableString* hash = [NSMutableString string];
     for(size_t i = 0; i < sizeof(sha); i++)
@@ -306,7 +309,7 @@ const char* kssysteminfo_toJSON(void)
     return strdup([jsonData bytes]);
 }
 
-const char* kssystemInfo_copyProcessName(void)
+char* kssysteminfo_copyProcessName(void)
 {
     return strdup([[NSProcessInfo processInfo].processName UTF8String]);
 }

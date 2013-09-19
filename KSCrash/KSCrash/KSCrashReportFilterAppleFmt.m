@@ -31,17 +31,19 @@
 #import <mach/machine.h>
 
 #import "ARCSafe_MemMgmt.h"
+#import "KSCrashCallCompletion.h"
 #import "KSCrashReportFields.h"
+#import "KSJSONCodecObjC.h"
 #import "KSSafeCollections.h"
 #import "KSSystemInfo.h"
 #import "RFC3339DateTool.h"
 
 
 #if defined(__LP64__)
-    #define FMT_PTR_SHORT        @"0x%llx"
-    #define FMT_PTR_LONG         @"0x%016llx"
-    #define FMT_PTR_RJ           @"%#18llx"
-    #define FMT_OFFSET           @"%llu"
+    #define FMT_PTR_SHORT        @"0x%lx"
+    #define FMT_PTR_LONG         @"0x%016lx"
+    #define FMT_PTR_RJ           @"%#18lx"
+    #define FMT_OFFSET           @"%lu"
 #else
     #define FMT_PTR_SHORT        @"0x%lx"
     #define FMT_PTR_LONG         @"0x%08lx"
@@ -55,7 +57,7 @@
 
 #define kAppleRedactedText @"<redacted>"
 
-#define kExpectedMajorVersion 2
+#define kExpectedMajorVersion 3
 
 
 @interface KSCrashReportFilterAppleFmt ()
@@ -188,7 +190,7 @@ NSDictionary* g_registerOrders;
         }
     }
 
-    onCompletion(filteredReports, YES, nil);
+    kscrash_i_callCompletion(onCompletion, filteredReports, YES, nil);
 }
 
 - (NSString*) CPUType:(NSString*) CPUArch
@@ -251,7 +253,7 @@ NSDictionary* g_registerOrders;
 {
     NSMutableString* str = [NSMutableString string];
 
-    NSUInteger traceNum = 0;
+    int traceNum = 0;
     for(NSDictionary* trace in [backtrace objectForKey:@KSCrashField_Contents])
     {
         uintptr_t pc = (uintptr_t)[[trace objectForKey:@KSCrashField_InstructionAddr] longLongValue];
@@ -509,6 +511,16 @@ NSDictionary* g_registerOrders;
 
     [str appendString:@"\nExtra Information:\n"];
 
+    NSDictionary* system = [self systemReport:report];
+    NSDictionary* crash = [self crashReport:report];
+    NSDictionary* error = [crash objectForKey:@KSCrashField_Error];
+    NSDictionary* nsexception = [error objectForKey:@KSCrashField_NSException];
+    NSDictionary* referencedObject = [nsexception objectForKey:@KSCrashField_ReferencedObject];
+    if(referencedObject != nil)
+    {
+        [str appendFormat:@"Object referenced by NSException:\n%@\n", [self JSONForObject:referencedObject]];
+    }
+    
     NSDictionary* crashedThread = [self crashedThread:report];
     if(crashedThread != nil)
     {
@@ -524,39 +536,7 @@ NSDictionary* g_registerOrders;
         NSDictionary* notableAddresses = [crashedThread objectForKey:@KSCrashField_NotableAddresses];
         if(notableAddresses != nil)
         {
-            [str appendString:@"\nNotable Addresses:\n"];
-
-            for(NSString* source in [notableAddresses.allKeys sortedArrayUsingSelector:@selector(compare:)])
-            {
-                NSDictionary* entry = [notableAddresses objectForKey:source];
-                uintptr_t address = (uintptr_t)[[entry objectForKey:@KSCrashField_Address] unsignedLongLongValue];
-                NSString* zombieName = [entry objectForKey:@KSCrashField_LastDeallocObject];
-                NSString* memType = [entry objectForKey:@KSCrashField_Contents];
-
-                [str appendFormat:@"* %-17s (" FMT_PTR_LONG "): ", [source UTF8String], address];
-
-                if([memType isEqualToString:@KSCrashMemType_String])
-                {
-                    NSString* value = [entry objectForKey:@KSCrashField_Value];
-                    [str appendFormat:@"string : %@", value];
-                }
-                else if([memType isEqualToString:@KSCrashMemType_Class] ||
-                        [memType isEqualToString:@KSCrashMemType_Object])
-                {
-                    NSString* class = [entry objectForKey:@KSCrashField_Class];
-                    NSString* type = [memType isEqualToString:@KSCrashMemType_Object] ? @"object :" : @"class  :";
-                    [str appendFormat:@"%@ %@", type, class];
-                }
-                else
-                {
-                    [str appendFormat:@"unknown:"];
-                }
-                if(zombieName != nil)
-                {
-                    [str appendFormat:@" (was %@)", zombieName];
-                }
-                [str appendString:@"\n"];
-            }
+            [str appendFormat:@"\nNotable Addresses:\n%@\n", [self JSONForObject:notableAddresses]];
         }
     }
 
@@ -566,12 +546,23 @@ NSDictionary* g_registerOrders;
         uintptr_t address = (uintptr_t)[[lastException objectForKey:@KSCrashField_Address] unsignedLongLongValue];
         NSString* name = [lastException objectForKey:@KSCrashField_Name];
         NSString* reason = [lastException objectForKey:@KSCrashField_Reason];
+        referencedObject = [lastException objectForKey:@KSCrashField_ReferencedObject];
         [str appendFormat:@"\nLast deallocated NSException (" FMT_PTR_LONG "): %@: %@\n",
          address, name, reason];
+        if(referencedObject != nil)
+        {
+            [str appendFormat:@"Referenced object:\n%@\n", [self JSONForObject:referencedObject]];
+        }
         [str appendString:
          [self backtraceString:[lastException objectForKey:@KSCrashField_Backtrace]
                    reportStyle:self.reportStyle
             mainExecutableName:mainExecutableName]];
+    }
+
+    NSDictionary* appStats = [system objectForKey:@KSCrashField_AppStats];
+    if(appStats != nil)
+    {
+        [str appendFormat:@"\nApplication Stats:\n%@\n", [self JSONForObject:appStats]];
     }
 
     NSDictionary* crashReport = [report objectForKey:@KSCrashField_Crash];
@@ -584,6 +575,58 @@ NSDictionary* g_registerOrders;
     return str;
 }
 
+- (NSString*) JSONForObject:(id) object
+{
+    NSError* error = nil;
+    NSData* encoded = [KSJSONCodec encode:object
+                                  options:KSJSONEncodeOptionPretty |
+                       KSJSONEncodeOptionSorted
+                                    error:&error];
+    if(error != nil)
+    {
+        return [NSString stringWithFormat:@"Error encoding JSON: %@", error];
+    }
+    else
+    {
+        return as_autorelease([[NSString alloc] initWithData:encoded encoding:NSUTF8StringEncoding]);
+    }
+}
+
+- (BOOL) isZombieNSException:(NSDictionary*) report
+{
+    NSDictionary* crash = [self crashReport:report];
+    NSDictionary* error = [crash objectForKey:@KSCrashField_Error];
+    NSDictionary* mach = [error objectForKey:@KSCrashField_Mach];
+    NSString* machExcName = [mach objectForKey:@KSCrashField_ExceptionName];
+    NSString* machCodeName = [mach objectForKey:@KSCrashField_CodeName];
+    if(![machExcName isEqualToString:@"EXC_BAD_ACCESS"] ||
+       ![machCodeName isEqualToString:@"KERN_INVALID_ADDRESS"])
+    {
+        return NO;
+    }
+
+    NSDictionary* lastException = [[self processReport:report] objectForKey:@KSCrashField_LastDeallocedNSException];
+    if(lastException == nil)
+    {
+        return NO;
+    }
+    NSNumber* lastExceptionAddress = [lastException objectForKey:@KSCrashField_Address];
+
+    NSDictionary* thread = [self crashedThread:report];
+    NSDictionary* registers = [(NSDictionary*)[thread objectForKey:@KSCrashField_Registers] objectForKey:@KSCrashField_Basic];
+
+    for(NSString* reg in registers)
+    {
+        NSNumber* address = [registers objectForKey:reg];
+        if([address isEqualToNumber:lastExceptionAddress])
+        {
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
 - (NSString*) errorInfoStringForReport:(NSDictionary*) report
 {
     NSMutableString* str = [NSMutableString string];
@@ -591,8 +634,12 @@ NSDictionary* g_registerOrders;
     NSDictionary* thread = [self crashedThread:report];
     NSDictionary* crash = [self crashReport:report];
     NSDictionary* error = [crash objectForKey:@KSCrashField_Error];
+    NSDictionary* type = [error objectForKey:@KSCrashField_Type];
 
     NSDictionary* nsexception = [error objectForKey:@KSCrashField_NSException];
+    NSDictionary* cppexception = [error objectForKey:@KSCrashField_CPPException];
+    NSDictionary* lastException = [[self processReport:report] objectForKey:@KSCrashField_LastDeallocedNSException];
+    NSDictionary* userException = [error objectForKey:@KSCrashField_UserReported];
     NSDictionary* mach = [error objectForKey:@KSCrashField_Mach];
     NSDictionary* signal = [error objectForKey:@KSCrashField_Signal];
 
@@ -623,13 +670,66 @@ NSDictionary* g_registerOrders;
 
     if(nsexception != nil)
     {
-        [str appendFormat:@"\nApplication Specific Information:\n"];
-        [str appendFormat:@"*** Terminating app due to uncaught exception '%@', reason: '%@'\n",
-         [nsexception objectForKey:@KSCrashField_Name],
-         [nsexception objectForKey:@KSCrashField_Reason]];
+        [str appendString:[self stringWithUncaughtExceptionName:[nsexception objectForKey:@KSCrashField_Name]
+                                                         reason:[error objectForKey:@KSCrashField_Reason]]];
+    }
+    else if([self isZombieNSException:report])
+    {
+        [str appendString:[self stringWithUncaughtExceptionName:[lastException objectForKey:@KSCrashField_Name]
+                                                         reason:[lastException objectForKey:@KSCrashField_Reason]]];
+        [str appendString:@"NOTE: This exception has been deallocated! Stack trace is crash from attempting to access this zombie exception.\n"];
+    }
+    else if(userException != nil)
+    {
+        [str appendString:[self stringWithUncaughtExceptionName:[userException objectForKey:@KSCrashField_Name]
+                                                         reason:[error objectForKey:@KSCrashField_Reason]]];
+        NSString* trace = [self userExceptionTrace:userException];
+        if(trace.length > 0)
+        {
+            [str appendFormat:@"\n%@\n", trace];
+        }
+    }
+    else if([type isEqual:@KSCrashExcType_CPPException])
+    {
+        [str appendString:[self stringWithUncaughtExceptionName:[cppexception objectForKey:@KSCrashField_Name]
+                                                         reason:[error objectForKey:@KSCrashField_Reason]]];
+    }
+
+    if([@KSCrashExcType_Deadlock isEqualToString:[error objectForKey:@KSCrashField_Type]])
+    {
+        [str appendFormat:@"\nApplication main thread deadlocked\n"];
     }
 
     return str;
+}
+
+- (NSString*) stringWithUncaughtExceptionName:(NSString*) name reason:(NSString*) reason
+{
+    return [NSString stringWithFormat:
+            @"\nApplication Specific Information:\n"
+            @"*** Terminating app due to uncaught exception '%@', reason: '%@'\n",
+            name, reason];
+}
+
+- (NSString*) userExceptionTrace:(NSDictionary*)userException
+{
+    NSMutableString* str = [NSMutableString string];
+    NSString* line = [userException objectForKey:@KSCrashField_LineOfCode];
+    if(line != nil)
+    {
+        [str appendFormat:@"Line: %@\n", line];
+    }
+    NSArray* backtrace = [userException objectForKey:@KSCrashField_Backtrace];
+    for(NSString* entry in backtrace)
+    {
+        [str appendFormat:@"%@\n", entry];
+    }
+
+    if(str.length > 0)
+    {
+        return [@"Custom Backtrace:\n" stringByAppendingString:str];
+    }
+    return @"";
 }
 
 - (NSString*) threadStringForThread:(NSDictionary*) thread
